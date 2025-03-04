@@ -2,66 +2,68 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 
 #define PORT 20000
 #define BUFFER_SIZE 1024
-#define ADDRESS_IP "127.0.0.1"
+
+void receive_file(int client_socket, const char *filename) {
+    FILE *file = fopen(filename, "wb");
+    if (!file) {
+        perror("File open failed");
+        return;
+    }
+
+    char buffer[BUFFER_SIZE];
+    int bytes_received;
+    
+    while ((bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0)) > 0) {
+        fwrite(buffer, 1, bytes_received, file);
+    }
+
+    printf("File received successfully as: %s\n", filename);
+    fclose(file);
+}
 
 int main() {
-    int server_fd, new_socket;
-    struct sockaddr_in address;
-    socklen_t addr_len = sizeof(address);
-    char buffer[BUFFER_SIZE];
+    int server_fd, client_socket;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_len = sizeof(client_addr);
 
-    // Create socket 
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("Socket failed");
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == -1) {
+        perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
 
-    // Configure server address
-    address.sin_family = AF_INET;
-    inet_pton(AF_INET, ADDRESS_IP, &address.sin_addr);
-    address.sin_port = htons(PORT);
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    // Bind socket
-    if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(PORT);
+
+    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
 
-    // Listen for connections
-    if (listen(server_fd, 3) < 0) {
+    if (listen(server_fd, 5) < 0) {
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
 
-    printf("Server listening on %s:%d\n", ADDRESS_IP, PORT);
-
-    // Accept client connection
-    new_socket = accept(server_fd, (struct sockaddr*)&address, &addr_len);
-    if (new_socket < 0) {
+    printf("Server listening on port %d...\n", PORT);
+    client_socket = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+    if (client_socket < 0) {
         perror("Accept failed");
         exit(EXIT_FAILURE);
     }
 
-    // Echo loop
-    while (1) {
-        memset(buffer, 0, BUFFER_SIZE);
-        int bytes_received = read(new_socket, buffer, BUFFER_SIZE);
-        if (bytes_received <= 0) {
-            printf("Client disconnected\n");
-            break;
-        }
+    printf("Client connected. Receiving file...\n");
+    receive_file(client_socket, "received_file.txt");
 
-        printf("Received: %s\n", buffer);
-        send(new_socket, buffer, bytes_received, 0);
-    }
-
-    close(new_socket);
+    close(client_socket);
     close(server_fd);
     return 0;
 }
