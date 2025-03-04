@@ -3,25 +3,69 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/stat.h>
 
 #define PORT 20000
 #define BUFFER_SIZE 1024
+#define SERVER_DIR "server_dir"
+
+void send_file(int client_socket, const char *filename) {
+    char filepath[512];
+    snprintf(filepath, sizeof(filepath), "%s/%s", SERVER_DIR, filename);
+
+    FILE *file = fopen(filepath, "rb");
+    if (!file) {
+        perror("File open failed");
+        const char *error_message = "File not found on the server.\n";
+        send(client_socket, error_message, strlen(error_message), 0);
+        return;
+    }
+
+    char buffer[BUFFER_SIZE];
+    int bytes_read;
+    
+    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
+        send(client_socket, buffer, bytes_read, 0);
+    }
+
+    printf("File sent successfully: %s\n", filename);
+    fclose(file);
+
+    close(client_socket);
+}
 
 void receive_file(int client_socket, const char *filename) {
-    FILE *file = fopen(filename, "wb");
+    char filepath[512];
+    snprintf(filepath, sizeof(filepath), "%s/%s", "server_dir", filename);
+
+    FILE *file = fopen(filepath, "wb");
     if (!file) {
         perror("File open failed");
         return;
     }
 
+    printf("Receiving file: %s\n", filename);  // Debugging line
+
     char buffer[BUFFER_SIZE];
     int bytes_received;
-    
+    int total_bytes_received = 0;
+
+    // Receive data in chunks
     while ((bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0)) > 0) {
-        fwrite(buffer, 1, bytes_received, file);
+        printf("Received %d bytes\n", bytes_received);  // Debugging line
+
+        // Write data to the file
+        if (fwrite(buffer, 1, bytes_received, file) != bytes_received) {
+            perror("File write failed");
+            fclose(file);
+            return;
+        }
+
+        total_bytes_received += bytes_received;
     }
 
-    printf("File received successfully as: %s\n", filename);
+    printf("Total bytes received: %d\n", total_bytes_received);  // Debugging line
+    printf("File received successfully: %s\n", filename);
     fclose(file);
 }
 
@@ -60,8 +104,36 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Client connected. Receiving file...\n");
-    receive_file(client_socket, "received_file.txt");
+    printf("Client connected.\n");
+
+    char command[BUFFER_SIZE];
+    while (1) {
+        memset(command, 0, sizeof(command));
+
+        // Receive the command (e.g., "put filename.txt" or "get filename.txt")
+        int bytes_received = recv(client_socket, command, sizeof(command) - 1, 0);
+        if (bytes_received <= 0) {
+            break;
+        }
+
+        command[bytes_received] = '\0';  // Null-terminate the string
+        printf("Received command: %s\n", command);
+
+        if (strncmp(command, "put ", 4) == 0) {
+            // Extract the filename and receive the file
+            char filename[256];
+            sscanf(command + 4, "%s", filename);
+            receive_file(client_socket, filename);
+        } else if (strncmp(command, "get ", 4) == 0) {
+            // Extract the filename and send the file
+            char filename[256];
+            sscanf(command + 4, "%s", filename);
+            send_file(client_socket, filename);
+        } else {
+            const char *error_message = "Invalid command.\n";
+            send(client_socket, error_message, strlen(error_message), 0);
+        }
+    }
 
     close(client_socket);
     close(server_fd);
