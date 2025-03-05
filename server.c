@@ -44,7 +44,7 @@ void receive_file(int client_socket, const char *filename) {
         return;
     }
 
-    printf("Receiving file: %s\n", filename);  // Debugging line
+    printf("Receiving file: %s\n", filename);
 
     char buffer[BUFFER_SIZE];
     int bytes_received;
@@ -52,7 +52,7 @@ void receive_file(int client_socket, const char *filename) {
 
     // Receive data in chunks
     while ((bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0)) > 0) {
-        printf("Received %d bytes\n", bytes_received);  // Debugging line
+        printf("Received %d bytes\n", bytes_received);
 
         // Write data to the file
         if (fwrite(buffer, 1, bytes_received, file) != bytes_received) {
@@ -64,7 +64,7 @@ void receive_file(int client_socket, const char *filename) {
         total_bytes_received += bytes_received;
     }
 
-    printf("Total bytes received: %d\n", total_bytes_received);  // Debugging line
+    printf("Total bytes received: %d\n", total_bytes_received);
     printf("File received successfully: %s\n", filename);
     fclose(file);
 }
@@ -116,7 +116,7 @@ int main() {
             break;
         }
 
-        command[bytes_received] = '\0';  // Null-terminate the string
+        command[bytes_received] = '\0'; 
         printf("Received command: %s\n", command);
 
         if (strncmp(command, "put ", 4) == 0) {

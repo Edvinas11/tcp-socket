@@ -28,7 +28,7 @@ void send_file(int sock, const char *filename) {
     int total_bytes_sent = 0;
 
     while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
-        printf("Sending %d bytes\n", bytes_read);  // Debugging line
+        printf("Sending %d bytes\n", bytes_read); 
 
         if (send(sock, buffer, bytes_read, 0) == -1) {
             perror("Send failed");
@@ -43,11 +43,9 @@ void send_file(int sock, const char *filename) {
     printf("File sent successfully: %s\n", filename);
 
     fclose(file);
-    // Close the socket here to notify server that the transfer is complete
     close(sock);
 }
 
-// Function to receive a file from the server
 void receive_file(int sock, const char *filename) {
     char filepath[512];
     snprintf(filepath, sizeof(filepath), "%s/%s", CLIENT_DIR, filename);
